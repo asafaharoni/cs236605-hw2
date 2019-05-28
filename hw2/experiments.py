@@ -56,7 +56,27 @@ def run_experiment(run_name, out_dir='./results', seed=None,
     #  for you automatically.
     fit_res = None
     # ====== YOUR CODE: ======
-    raise NotImplementedError()
+
+    # GLOBALS:
+    print(f'device={device}')
+    x0, _ = ds_train[0]
+    in_size = x0.shape
+    num_class = 10
+
+    filters = []
+    for filter in filters_per_layer:
+        filters = filters + [filter] * layers_per_block
+
+    model = model_cls(in_size, num_class, filters=filters, pool_every=pool_every, hidden_dims=hidden_dims)
+    loss_fn = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9)
+    dl_train = torch.utils.data.DataLoader(ds_train, bs_train)
+    dl_test = torch.utils.data.DataLoader(ds_test, bs_test)
+    print(f'lens: dl_train={len(dl_train)}, dl_test={len(dl_test)}, ds_train={len(ds_train)}, ds_test={len(ds_test)}')
+
+    trainer = training.TorchTrainer(model, loss_fn, optimizer, device)
+    fit_res = trainer.fit(dl_train, dl_test, epochs, max_batches=batches, print_every=4, early_stopping=early_stopping)
+
     # ========================
 
     save_experiment(run_name, out_dir, cfg, fit_res)
@@ -117,7 +137,7 @@ def parse_cli():
                              'accuracy improves', default=None)
     sp_exp.add_argument('--lr', type=float,
                         help='Learning rate', default=1e-3)
-    sp_exp.add_argument('--reg', type=int,
+    sp_exp.add_argument('--reg', type=float,
                         help='L2 regularization', default=1e-3)
 
     # # Model

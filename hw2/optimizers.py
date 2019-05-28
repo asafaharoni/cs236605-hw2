@@ -71,7 +71,10 @@ class VanillaSGD(Optimizer):
             # Update the gradient according to regularization and then
             # update the parameters tensor.
             # ====== YOUR CODE: ======
-            raise NotImplementedError()
+            # L_v  = L_0 + 1/2 lambda p^2
+            # dL_v = dp + lambda p
+            dp += self.reg * p
+            p -= self.learn_rate * dp
             # ========================
 
 
@@ -90,7 +93,9 @@ class MomentumSGD(Optimizer):
 
         # TODO: Add your own initializations as needed.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        self.vel_cart = []
+        for p, _ in params:
+            self.vel_cart.append(torch.zeros_like(p))
         # ========================
 
     def step(self):
@@ -102,7 +107,12 @@ class MomentumSGD(Optimizer):
             # update the parameters tensor based on the velocity. Don't forget
             # to include the regularization term.
             # ====== YOUR CODE: ======
-            raise NotImplementedError()
+            dp += self.reg * p
+            vel = self.vel_cart.pop(0)
+            vel = self.momentum*vel - self.learn_rate*dp
+            p += vel
+            self.vel_cart.append(vel)
+            continue
             # ========================
 
 
@@ -123,7 +133,9 @@ class RMSProp(Optimizer):
 
         # TODO: Add your own initializations as needed.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        self.rmsprop_decayed_grads = []
+        for p, _ in params:
+            self.rmsprop_decayed_grads.append(torch.zeros_like(p))
         # ========================
 
     def step(self):
@@ -136,5 +148,10 @@ class RMSProp(Optimizer):
             # average of it's previous gradients. Use it to update the
             # parameters tensor.
             # ====== YOUR CODE: ======
-            raise NotImplementedError()
+            # dp += self.reg * p
+            dgrad = self.rmsprop_decayed_grads.pop(0)
+            dgrad = self.decay * dgrad + (1-self.decay) * (dp **2)
+            p -= self.learn_rate * ((dgrad + self.eps) ** -0.5) * dp
+            self.rmsprop_decayed_grads.append(dgrad)
+            continue
             # ========================

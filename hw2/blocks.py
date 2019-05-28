@@ -72,10 +72,12 @@ class Linear(Block):
         self.in_features = in_features
         self.out_features = out_features
 
-        # TODO: Create the weight matrix (w) and bias vector (b).
+        # TODO: Create the weight matrix (w) and bias vector (b). / DONE
 
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        self.w = torch.randn(out_features,in_features) * wstd
+        self.b = torch.randn(out_features) * wstd
+        # raise NotImplementedError()
         # ========================
 
         self.dw = torch.zeros_like(self.w)
@@ -97,10 +99,11 @@ class Linear(Block):
 
         x = x.reshape((x.shape[0], -1))
 
-        # TODO: Compute the affine transform
+        # TODO: Compute the affine transform / DONE
 
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        out = torch.mm(x, self.w.t()) + self.b
+        # raise NotImplementedError()
         # ========================
 
         self.grad_cache['x'] = x
@@ -113,13 +116,19 @@ class Linear(Block):
         """
         x = self.grad_cache['x']
 
-        # TODO: Compute
+        # TODO: Compute / DONE
         #   - dx, the gradient of the loss with respect to x
         #   - dw, the gradient of the loss with respect to w
         #   - db, the gradient of the loss with respect to b
         # You should accumulate gradients in dw and db.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        dz = dout
+        dx = torch.mm(dz, self.w)
+        dw = torch.mm(dz.t(), x)
+        db = dz.sum(0)
+        self.dw += dw
+        self.db += db
+        # raise NotImplementedError()
         # ========================
 
         return dx
@@ -143,9 +152,11 @@ class ReLU(Block):
         :return: ReLU of each sample in x.
         """
 
-        # TODO: Implement the ReLU operation.
+        # TODO: Implement the ReLU operation. / DONE
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        out = x.clone()
+        out[out<0] = 0
+        # raise NotImplementedError()
         # ========================
 
         self.grad_cache['x'] = x
@@ -158,9 +169,13 @@ class ReLU(Block):
         """
         x = self.grad_cache['x']
 
-        # TODO: Implement gradient w.r.t. the input x
+        # TODO: Implement gradient w.r.t. the input x  / DONE
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        dz = dout
+        # # dx = dL/dx = dL/dz * dz/dx = dz * 1(x>0)
+        dx = dz
+        dx[x<0] = 0
+        # raise NotImplementedError()
         # ========================
 
         return dx
@@ -187,10 +202,12 @@ class Sigmoid(Block):
         :return: Sigmoid of each sample in x.
         """
 
-        # TODO: Implement the Sigmoid function. Save whatever you need into
+        # TODO: Implement the Sigmoid function. Save whatever you need into / DONE
         # grad_cache.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        out = 1/(1+torch.exp(-x))
+        self.grad_cache['x'] = x
+        # raise NotImplementedError()
         # ========================
 
         return out
@@ -203,7 +220,14 @@ class Sigmoid(Block):
 
         # TODO: Implement gradient w.r.t. the input x
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        # s(x) = 1/(1+exp(-x))
+        # s'(x) = exp(-x) / (1+exp(-x))^2
+        # dx = dL/dx = dL/dz * dz/dx = dout * s'(x)
+        x = self.grad_cache['x']
+        ds_dx = torch.exp(-x) / (1+torch.exp(-x))**2
+        # print(f'the size of ds/dx is {ds_dx.shape} \nthe size of dout is {dout.shape}')
+        dx = dout * ds_dx
+        # raise NotImplementedError()
         # ========================
 
         return dx
@@ -242,12 +266,15 @@ class CrossEntropyLoss(Block):
         xmax, _ = torch.max(x, dim=1, keepdim=True)
         x = x - xmax  # for numerical stability
 
-        # TODO: Compute the cross entropy loss using the last formula from the
+        # TODO: Compute the cross entropy loss using the last formula from the / DONE
         # notebook (i.e. directly using the class scores).
         # Tip: to get a different column from each row of a matrix tensor m,
         # you can index it with m[range(num_rows), list_of_cols].
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        loss  =  -x[range(x.shape[0]), y] # -x_y
+        loss +=  torch.log(torch.sum(torch.exp(x), 1)) # log(sum(e^x))
+        loss  =  torch.sum(loss) / N
+        # raise NotImplementedError()
         # ========================
 
         self.grad_cache['x'] = x
@@ -266,7 +293,24 @@ class CrossEntropyLoss(Block):
 
         # TODO: Calculate the gradient w.r.t. the input x
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        # dx = dL/dx = dL/dz * dz/dx
+        # dL/dz = dz = dout
+        # dz/dx = (dz/dx1, ..., dz/dxk) # z is a 1-dim function of x
+        # dz/dx = d/dx (1/N) * (-x_y + log(sum(e^x))) =
+        #         -1(one-hot vector of y) + e^x * log(sum(e^x)))
+        dL_dz = dout
+
+        # calc dz/dx
+        one_hot = torch.zeros_like(x)
+        one_hot[range(N), y] = 1
+        exp_of_x_matrix = torch.exp(x)
+        sum_of_exp_x = torch.sum(exp_of_x_matrix, 1).unsqueeze(1)
+        dz_dx = (-one_hot + exp_of_x_matrix/sum_of_exp_x) / N
+
+        # calc dx = dL/dx
+        dx = dL_dz * dz_dx
+
+        # raise NotImplementedError()
         # ========================
 
         return dx
@@ -290,15 +334,29 @@ class Dropout(Block):
         # previous blocks, this block behaves differently a according to the
         # current mode (train/test).
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
-        # ========================
+        sampler = torch.distributions.bernoulli.Bernoulli(self.p).sample
+        self.drop_mat = sampler(x.size())
+        self.drop_mat = torch.bernoulli(x, self.p)
 
+        if self.training_mode:
+            out = self.drop_mat * x
+        else:
+            out = x * (1-self.p)
+        # ========================
         return out
 
     def backward(self, dout):
         # TODO: Implement the dropout backward pass.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        # if self.training_mode:
+        #     dx = self.drop_mat * dout
+        # else:
+        #     dx = dout
+        if self.training_mode:
+            dx = dout * self.drop_mat  # / self.p
+        else:
+            dx = dout * (1-self.p)
+
         # ========================
 
         return dx
@@ -321,10 +379,15 @@ class Sequential(Block):
     def forward(self, x, **kw):
         out = None
 
-        # TODO: Implement the forward pass by passing each block's output
+        # TODO: Implement the forward pass by passing each block's output / DONE
         # as the input of the next.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        out = x
+        for block in self.blocks:
+            # print(f'The block is {block}, the input shape is {out.shape}', end=' ')
+            out = block(out, **kw)
+            # print(f'and the output shape is {out.shape}')
+        # raise NotImplementedError()
         # ========================
 
         return out
@@ -336,7 +399,10 @@ class Sequential(Block):
         # Each block's input gradient should be the previous block's output
         # gradient. Behold the backpropagation algorithm in action!
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        din = dout
+        for block in reversed(self.blocks):
+            din = block.backward(din)
+        # raise NotImplementedError()
         # ========================
 
         return din
@@ -346,7 +412,9 @@ class Sequential(Block):
 
         # TODO: Return the parameter tuples from all blocks.
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        for block in self.blocks:
+            params +=block.params()
+        # raise NotImplementedError()
         # ========================
 
         return params

@@ -58,6 +58,8 @@ class Trainer(abc.ABC):
         best_acc = None
         epochs_without_improvement = 0
 
+        same_score_counter = 0
+
         for epoch in range(num_epochs):
             verbose = False  # pass this to train/test_epoch.
             if epoch % print_every == 0 or epoch == num_epochs-1:
@@ -72,7 +74,27 @@ class Trainer(abc.ABC):
             # - Optional: Implement early stopping. This is a very useful and
             #   simple regularization technique that is highly recommended.
             # ====== YOUR CODE: ======
-            raise NotImplementedError()
+            train_results = self.train_epoch(dl_train, verbose=verbose, **kw)
+            train_loss.append((sum(train_results.losses) / len(train_results.losses)).item())
+            train_acc.append(train_results.accuracy.item())
+
+            test_results = self.test_epoch(dl_test, verbose=verbose, **kw)
+            test_loss.append((sum(test_results.losses) / len(test_results.losses)).item())
+            test_acc.append(test_results.accuracy.item())
+
+            epsilon = 1e-3
+
+            if early_stopping and len(test_loss) > 1:
+                # print(test_loss[-2:])
+                if (train_loss[-2] - train_loss[-1] < epsilon) or (test_loss[-1] < epsilon):
+                    # print("ADD")
+                    same_score_counter = same_score_counter + 1
+                    if same_score_counter == early_stopping:
+                        print("BROKE")
+                        break
+                else:
+                    same_score_counter = 0
+
             # ========================
 
         return FitResult(actual_num_epochs,
@@ -188,7 +210,28 @@ class BlocksTrainer(Trainer):
         # - Optimize params
         # - Calculate number of correct predictions
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+
+
+        # Forward pass
+        x = X.view(X.shape[0],-1)
+        y_pred = self.model.forward(x)
+
+        # Compute and print loss.
+        loss = self.loss_fn(y_pred, y)
+
+        # Reset all of the gradients.
+        self.optimizer.zero_grad()
+
+        # Backward pass
+        dout = self.loss_fn.backward()
+        self.model.backward(dout)
+
+        # Calling the optimizer step function
+        self.optimizer.step()
+
+        # Calculate number of correct predictions
+        predicted_labels = torch.argmax(y_pred,1)
+        num_correct = torch.sum(predicted_labels == y)
         # ========================
 
         return BatchResult(loss, num_correct)
@@ -200,7 +243,11 @@ class BlocksTrainer(Trainer):
         # - Forward pass
         # - Calculate number of correct predictions
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+        x = X.view(X.shape[0],-1)
+        y_pred = self.model.forward(x)
+        loss = self.loss_fn(y_pred,y)
+        predicted_labels = torch.argmax(y_pred,1)
+        num_correct = torch.sum(predicted_labels == y)
         # ========================
 
         return BatchResult(loss, num_correct)
@@ -222,7 +269,25 @@ class TorchTrainer(Trainer):
         # - Optimize params
         # - Calculate number of correct predictions
         # ====== YOUR CODE: ======
-        raise NotImplementedError()
+
+        # Forward pass
+        y_pred = self.model(X)
+
+        # Compute and print loss.
+        loss = self.loss_fn(y_pred, y)
+
+        # Reset all of the gradients.
+        self.optimizer.zero_grad()
+
+        # Backward pass
+        loss.backward()
+
+        # Calling the optimizer step function
+        self.optimizer.step()
+
+        # Calculate number of correct predictions
+        predicted_labels = torch.argmax(y_pred,1)
+        num_correct = torch.sum(predicted_labels == y)
         # ========================
 
         return BatchResult(loss, num_correct)
@@ -238,7 +303,10 @@ class TorchTrainer(Trainer):
             # - Forward pass
             # - Calculate number of correct predictions
             # ====== YOUR CODE: ======
-            raise NotImplementedError()
+            y_pred = self.model(X)
+            loss = self.loss_fn(y_pred, y)
+            predicted_labels = torch.argmax(y_pred, 1)
+            num_correct = torch.sum(predicted_labels == y)
             # ========================
 
         return BatchResult(loss, num_correct)
